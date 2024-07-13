@@ -11,10 +11,24 @@ public class Cone implements Shape {
 
     public Cone(Vector3D baseCenter, Vector3D axisDirection, double height, double radius, Color color) {
         this.baseCenter = baseCenter;
-        this.axisDirection = axisDirection.normalize(); // Normalize axis direction vector
+        this.axisDirection = axisDirection.normalize();
         this.height = height;
         this.radius = radius;
         this.color = color;
+    }
+    
+    @Override
+    public Vector3D getNormal(Vector3D point) {
+        Vector3D baseToPoint = point.subtract(baseCenter);
+        double projectionLength = baseToPoint.dot(axisDirection);
+        Vector3D projectionPoint = baseCenter.add(axisDirection.scale(projectionLength));
+        
+        if (projectionLength <= 0) {
+            return axisDirection.scale(-1);
+        }
+        
+        Vector3D normal = point.subtract(projectionPoint);
+        return normal.normalize();
     }
 
     @Override
@@ -27,15 +41,15 @@ public class Cone implements Shape {
         Vector3D rayOrigin = ray.getOrigin();
         Vector3D rayDirection = ray.getDirection();
 
-        // Vector from the ray origin to the cone base center
         Vector3D oc = rayOrigin.subtract(baseCenter);
 
-        // Compute coefficients for the quadratic equation
-        double a = rayDirection.dot(rayDirection) - (1 + Math.pow(Math.tan(radius), 2)) * Math.pow(rayDirection.dot(axisDirection), 2);
-        double b = 2 * (oc.dot(rayDirection) - (1 + Math.pow(Math.tan(radius), 2)) * rayDirection.dot(axisDirection) * oc.dot(axisDirection));
-        double c = oc.dot(oc) - (1 + Math.pow(Math.tan(radius), 2)) * Math.pow(oc.dot(axisDirection), 2);
+        double k = Math.tan(Math.atan(radius / height));
+        k = k * k;
 
-        // Calculate discriminant of the quadratic equation
+        double a = rayDirection.dot(rayDirection) - (1 + k) * Math.pow(rayDirection.dot(axisDirection), 2);
+        double b = 2 * (oc.dot(rayDirection) - (1 + k) * rayDirection.dot(axisDirection) * oc.dot(axisDirection));
+        double c = oc.dot(oc) - (1 + k) * Math.pow(oc.dot(axisDirection), 2);
+
         double discriminant = b * b - 4 * a * c;
 
         if (discriminant < 0) {
@@ -46,7 +60,6 @@ public class Cone implements Shape {
         double root1 = (-b - sqrtDiscriminant) / (2.0 * a);
         double root2 = (-b + sqrtDiscriminant) / (2.0 * a);
 
-        // Find the valid intersection point
         double tCone = -1.0;
         if (root1 > 0 && root1 < t[0]) {
             tCone = root1;
@@ -56,7 +69,6 @@ public class Cone implements Shape {
             return false;
         }
 
-        // Check if the intersection point is within cone height
         Vector3D intersectionPoint = ray.pointAtParameter(tCone);
         Vector3D baseToIntersection = intersectionPoint.subtract(baseCenter);
         double projection = baseToIntersection.dot(axisDirection);

@@ -1,9 +1,4 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package com.mycompany.raytracer;
-
 
 import java.awt.Color;
 
@@ -16,14 +11,6 @@ public class Sphere implements Shape {
         this.center = center;
         this.radius = radius;
         this.color = color;
-    }
-
-    public Vector3D getCenter() {
-        return center;
-    }
-
-    public double getRadius() {
-        return radius;
     }
 
     @Override
@@ -68,5 +55,20 @@ public class Sphere implements Shape {
         }
 
         return false;
+    }
+
+    @Override
+    public Vector3D getNormal(Vector3D point) {
+        // The normal at any point on a sphere is the normalized vector 
+        // from the center of the sphere to that point
+        return point.subtract(center).normalize();
+    }
+
+    public Vector3D getCenter() {
+        return center;
+    }
+
+    public double getRadius() {
+        return radius;
     }
 }

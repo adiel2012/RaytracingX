@@ -27,12 +27,10 @@ public class Cylinder implements Shape {
 
         Vector3D oc = rayOrigin.subtract(center);
 
-        // Calculate coefficients for the quadratic equation
         double a = rayDirection.getX() * rayDirection.getX() + rayDirection.getZ() * rayDirection.getZ();
         double b = 2.0 * (oc.getX() * rayDirection.getX() + oc.getZ() * rayDirection.getZ());
         double c = oc.getX() * oc.getX() + oc.getZ() * oc.getZ() - radius * radius;
 
-        // Solve the quadratic equation
         double discriminant = b * b - 4.0 * a * c;
 
         if (discriminant < 0) {
@@ -43,7 +41,6 @@ public class Cylinder implements Shape {
         double t1 = (-b - sqrtDiscriminant) / (2.0 * a);
         double t2 = (-b + sqrtDiscriminant) / (2.0 * a);
 
-        // Check if intersections are within the cylinder's height
         double minY = center.getY() - height / 2.0;
         double maxY = center.getY() + height / 2.0;
         double intersectY1 = rayOrigin.getY() + t1 * rayDirection.getY();
@@ -61,12 +58,47 @@ public class Cylinder implements Shape {
             }
         }
 
-        // Update the closest intersection distance
-        if (tMin < t[0]) {
-            t[0] = tMin;
+        double tCap = Double.POSITIVE_INFINITY;
+        if (rayDirection.getY() != 0) {
+            double tBottom = (minY - rayOrigin.getY()) / rayDirection.getY();
+            double tTop = (maxY - rayOrigin.getY()) / rayDirection.getY();
+
+            if (tBottom > 0) {
+                Vector3D pBottom = ray.pointAtParameter(tBottom);
+                if (pBottom.subtract(new Vector3D(center.getX(), minY, center.getZ())).magnitude() <= radius) {
+                    tCap = tBottom;
+                }
+            }
+
+            if (tTop > 0 && tTop < tCap) {
+                Vector3D pTop = ray.pointAtParameter(tTop);
+                if (pTop.subtract(new Vector3D(center.getX(), maxY, center.getZ())).magnitude() <= radius) {
+                    tCap = tTop;
+                }
+            }
+        }
+
+        if (tMin < t[0] || tCap < t[0]) {
+            t[0] = Math.min(tMin, tCap);
             return true;
         }
 
         return false;
+    }
+
+    @Override
+    public Vector3D getNormal(Vector3D point) {
+        double minY = center.getY() - height / 2.0;
+        double maxY = center.getY() + height / 2.0;
+        double epsilon = 1e-6;
+
+        if (Math.abs(point.getY() - minY) < epsilon) {
+            return new Vector3D(0, -1, 0);
+        } else if (Math.abs(point.getY() - maxY) < epsilon) {
+            return new Vector3D(0, 1, 0);
+        } else {
+            Vector3D sideNormal = new Vector3D(point.getX() - center.getX(), 0, point.getZ() - center.getZ());
+            return sideNormal.normalize();
+        }
     }
 }

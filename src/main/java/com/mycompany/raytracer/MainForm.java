@@ -2,37 +2,21 @@ package com.mycompany.raytracer;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.util.LinkedList;
+import java.awt.event.*;
+import java.util.ArrayList;
 import java.util.List;
 
 public class MainForm extends JFrame {
     private RenderPanel renderPanel;
     private Vector3D cameraPosition;
     private Vector3D lookAtPoint;
+    private List<Shape> shapes;
+    private List<Light> lights;
+    private RayTracer rayTracer;
 
     public MainForm() {
         initComponents();
-        cameraPosition = new Vector3D(0, 0, 0);
-        lookAtPoint = new Vector3D(0, 0, -5);
-
-        // Add a ComponentListener to ensure the RenderPanel is properly sized before rendering
-        renderPanel.addComponentListener(new ComponentAdapter() {
-            @Override
-            public void componentShown(ComponentEvent e) {
-                renderScene();
-            }
-
-            @Override
-            public void componentResized(ComponentEvent e) {
-                renderScene();
-            }
-        });
+        initScene();
     }
 
     private void initComponents() {
@@ -40,18 +24,51 @@ public class MainForm extends JFrame {
         setTitle("Ray Tracing Demo");
         setSize(800, 600);
 
-        // Create a RenderPanel for rendering the scene
         renderPanel = new RenderPanel();
         add(renderPanel, BorderLayout.CENTER);
 
-        // Add keyboard and mouse listeners for camera navigation
+        JPanel controlPanel = new JPanel();
+        JButton renderButton = new JButton("Render");
+        renderButton.addActionListener(e -> renderScene());
+        controlPanel.add(renderButton);
+
+        add(controlPanel, BorderLayout.SOUTH);
+
         addKeyListener(new CameraKeyListener());
         renderPanel.addMouseListener(new CameraMouseListener());
         renderPanel.addMouseMotionListener(new CameraMouseListener());
+        renderPanel.setFocusable(true);
+        renderPanel.requestFocusInWindow();
+
+        renderPanel.addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                renderScene();
+            }
+        });
     }
 
-    public RenderPanel getRenderPanel() {
-        return renderPanel;
+    private void initScene() {
+        cameraPosition = new Vector3D(0, 0, 5);
+        lookAtPoint = new Vector3D(0, 0, 0);
+
+        shapes = new ArrayList<>();
+        lights = new ArrayList<>();
+
+        // Add shapes
+        shapes.add(new Sphere(new Vector3D(0, 0, -1), 1, Color.RED));
+        shapes.add(new Cone(new Vector3D(2, -1, -2), new Vector3D(0, 1, 0), 2, 1, Color.BLUE));
+        shapes.add(new Cube(new Vector3D(-2, 0, -2), 1.5, Color.GREEN));
+        shapes.add(new Cuboid(new Vector3D(0, -1, -2), new Vector3D(0.5, 1, 0.5), Color.CYAN));
+        shapes.add(new Cylinder(new Vector3D(-2, 1, -3), 0.5, 2, Color.MAGENTA));
+        shapes.add(new Plane(new Vector3D(0, 1, 0), 2, Color.GRAY));
+        //shapes.add(new Pyramid(new Vector3D(2, 0, -4), 2, 2, 2, Color.YELLOW));
+
+        // Add lights
+        lights.add(new Light(new Vector3D(5, 5, 5), Color.WHITE, 1.0));
+        lights.add(new Light(new Vector3D(-5, 5, 5), Color.WHITE, 0.5));
+
+        rayTracer = new RayTracer(lights);
     }
 
     public void renderScene() {
@@ -59,29 +76,6 @@ public class MainForm extends JFrame {
             return;
         }
 
-        RayTracer rayTracer = new RayTracer();
-        List<Shape> shapes = new LinkedList<>();
-
-        double depth = -20;
-
-        // Sphere
-        shapes.add(new Sphere(new Vector3D(0, 0, depth), 1, Color.RED));
-
-        // Create and add a new Cone
-        Vector3D coneBaseCenter = new Vector3D(2, 0, depth);
-        Vector3D coneAxisDirection = new Vector3D(-1, 1, 0);
-        double coneHeight = 2;
-        double coneRadius = Math.PI / 6;
-        Color coneColor = Color.BLUE;
-        shapes.add(new Cone(coneBaseCenter, coneAxisDirection, coneHeight, coneRadius, coneColor));
-
-        // Cube
-        shapes.add(new Cube(new Vector3D(1, -1, depth), 2, Color.GREEN));
-
-        // Cuboid
-        shapes.add(new Cuboid(new Vector3D(-1, 1, depth), new Vector3D(0.2, 0.4, 1.0), Color.CYAN));
-
-        // Render the scene with camera position and look-at point
         rayTracer.draw(shapes, renderPanel, cameraPosition, lookAtPoint);
         renderPanel.repaint();
     }
@@ -97,33 +91,23 @@ public class MainForm extends JFrame {
         @Override
         public void keyPressed(KeyEvent e) {
             double moveSpeed = 0.5;
+            Vector3D moveDirection = new Vector3D(0, 0, 0);
 
             switch (e.getKeyCode()) {
-                case KeyEvent.VK_W:
-                    cameraPosition = cameraPosition.add(new Vector3D(0, 0, -moveSpeed));
-                    break;
-                case KeyEvent.VK_S:
-                    cameraPosition = cameraPosition.add(new Vector3D(0, 0, moveSpeed));
-                    break;
+                case KeyEvent.VK_W: moveDirection = lookAtPoint.subtract(cameraPosition).normalize(); break;
+                case KeyEvent.VK_S: moveDirection = cameraPosition.subtract(lookAtPoint).normalize(); break;
                 case KeyEvent.VK_A:
-                    cameraPosition = cameraPosition.add(new Vector3D(-moveSpeed, 0, 0));
+                    Vector3D right = lookAtPoint.subtract(cameraPosition).cross(new Vector3D(0, 1, 0)).normalize();
+                    moveDirection = right.scale(-1);
                     break;
                 case KeyEvent.VK_D:
-                    cameraPosition = cameraPosition.add(new Vector3D(moveSpeed, 0, 0));
-                    break;
-                case KeyEvent.VK_UP:
-                    lookAtPoint = lookAtPoint.add(new Vector3D(0, -moveSpeed, 0));
-                    break;
-                case KeyEvent.VK_DOWN:
-                    lookAtPoint = lookAtPoint.add(new Vector3D(0, moveSpeed, 0));
-                    break;
-                case KeyEvent.VK_LEFT:
-                    lookAtPoint = lookAtPoint.add(new Vector3D(-moveSpeed, 0, 0));
-                    break;
-                case KeyEvent.VK_RIGHT:
-                    lookAtPoint = lookAtPoint.add(new Vector3D(moveSpeed, 0, 0));
+                    right = lookAtPoint.subtract(cameraPosition).cross(new Vector3D(0, 1, 0)).normalize();
+                    moveDirection = right;
                     break;
             }
+
+            cameraPosition = cameraPosition.add(moveDirection.scale(moveSpeed));
+            lookAtPoint = lookAtPoint.add(moveDirection.scale(moveSpeed));
 
             renderScene();
         }
@@ -148,7 +132,14 @@ public class MainForm extends JFrame {
             int deltaY = e.getY() - lastMousePosition.y;
 
             double rotateSpeed = 0.01;
-            lookAtPoint = lookAtPoint.add(new Vector3D(-deltaX * rotateSpeed, deltaY * rotateSpeed, 0));
+            Vector3D cameraToLookAt = lookAtPoint.subtract(cameraPosition);
+            
+            cameraToLookAt = cameraToLookAt.rotate(new Vector3D(0, 1, 0), -deltaX * rotateSpeed);
+            
+            Vector3D right = cameraToLookAt.cross(new Vector3D(0, 1, 0)).normalize();
+            cameraToLookAt = cameraToLookAt.rotate(right, -deltaY * rotateSpeed);
+
+            lookAtPoint = cameraPosition.add(cameraToLookAt);
 
             lastMousePosition = e.getPoint();
             renderScene();

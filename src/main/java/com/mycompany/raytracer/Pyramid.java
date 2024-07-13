@@ -8,6 +8,8 @@ public class Pyramid implements Shape {
     private double baseDepth;
     private double height;
     private Color color;
+    private Vector3D apex;
+    private Vector3D[] baseVertices;
 
     public Pyramid(double baseCenterX, double baseCenterY, double baseCenterZ,
                    double baseWidth, double baseDepth, double height, Color color) {
@@ -16,6 +18,18 @@ public class Pyramid implements Shape {
         this.baseDepth = baseDepth;
         this.height = height;
         this.color = color;
+        
+        // Calculate apex
+        this.apex = new Vector3D(baseCenterX, baseCenterY + height, baseCenterZ);
+        
+        // Calculate base vertices
+        double halfWidth = baseWidth / 2.0;
+        double halfDepth = baseDepth / 2.0;
+        this.baseVertices = new Vector3D[4];
+        this.baseVertices[0] = new Vector3D(baseCenterX - halfWidth, baseCenterY, baseCenterZ - halfDepth);
+        this.baseVertices[1] = new Vector3D(baseCenterX + halfWidth, baseCenterY, baseCenterZ - halfDepth);
+        this.baseVertices[2] = new Vector3D(baseCenterX + halfWidth, baseCenterY, baseCenterZ + halfDepth);
+        this.baseVertices[3] = new Vector3D(baseCenterX - halfWidth, baseCenterY, baseCenterZ + halfDepth);
     }
 
     @Override
@@ -25,70 +39,95 @@ public class Pyramid implements Shape {
 
     @Override
     public boolean intersect(Ray ray, double[] t) {
-        // Center of the base
-        double baseCenterX = baseCenter.getX();
-        double baseCenterY = baseCenter.getY();
-        double baseCenterZ = baseCenter.getZ();
+        double closestT = Double.POSITIVE_INFINITY;
+        boolean hit = false;
 
-        // Half-dimensions of the base
-        double halfBaseWidth = baseWidth / 2.0;
-        double halfBaseDepth = baseDepth / 2.0;
-
-        // Vertices of the base
-        Vector3D v0 = new Vector3D(baseCenterX - halfBaseWidth, baseCenterY, baseCenterZ - halfBaseDepth);
-        Vector3D v1 = new Vector3D(baseCenterX + halfBaseWidth, baseCenterY, baseCenterZ - halfBaseDepth);
-        Vector3D v2 = new Vector3D(baseCenterX + halfBaseWidth, baseCenterY, baseCenterZ + halfBaseDepth);
-        Vector3D v3 = new Vector3D(baseCenterX - halfBaseWidth, baseCenterY, baseCenterZ + halfBaseDepth);
-
-        // Apex of the pyramid
-        Vector3D apex = new Vector3D(baseCenterX, baseCenterY + height, baseCenterZ);
-
-        // Check intersection with the base rectangle
-        Plane basePlane = new Plane(v0, v1, v2, color);
-        double[] tBase = { Double.POSITIVE_INFINITY };
-        boolean intersectsBase = basePlane.intersect(ray, tBase);
-
-        if (!intersectsBase || tBase[0] <= 0) {
-            return false;
+        // Check intersection with base
+        Plane basePlane = new Plane(baseVertices[0], baseVertices[1], baseVertices[2], color);
+        double[] baseT = { Double.POSITIVE_INFINITY };
+        if (basePlane.intersect(ray, baseT) && isPointInBase(ray.pointAtParameter(baseT[0]))) {
+            closestT = baseT[0];
+            hit = true;
         }
 
-        Vector3D intersectionPointBase = ray.pointAtParameter(tBase[0]);
-
-        // Check if intersection point is within the base rectangle
-        if (!isPointInRectangle(intersectionPointBase, v0, v1, v2, v3)) {
-            return false;
-        }
-
-        // Check intersection with each triangle face of the pyramid
-        Vector3D[] vertices = { v0, v1, v2, v3 };
-
+        // Check intersection with triangular faces
         for (int i = 0; i < 4; i++) {
-            Plane trianglePlane = new Plane(vertices[i], vertices[(i + 1) % 4], apex, color);
-            double[] tTriangle = { Double.POSITIVE_INFINITY };
-            boolean intersectsTriangle = trianglePlane.intersect(ray, tTriangle);
-
-            if (intersectsTriangle && tTriangle[0] > 0 && tTriangle[0] < t[0]) {
-                t[0] = tTriangle[0];
+            Vector3D v1 = baseVertices[i];
+            Vector3D v2 = baseVertices[(i + 1) % 4];
+            Plane facePlane = new Plane(v1, v2, apex, color);
+            double[] faceT = { Double.POSITIVE_INFINITY };
+            if (facePlane.intersect(ray, faceT) && isPointInTriangle(ray.pointAtParameter(faceT[0]), v1, v2, apex)) {
+                if (faceT[0] < closestT) {
+                    closestT = faceT[0];
+                    hit = true;
+                }
             }
         }
 
-        return t[0] != Double.POSITIVE_INFINITY;
+        if (hit && closestT < t[0]) {
+            t[0] = closestT;
+            return true;
+        }
+
+        return false;
     }
 
-    // Helper method to check if a point is within a rectangle defined by four vertices
-    private boolean isPointInRectangle(Vector3D point, Vector3D v0, Vector3D v1, Vector3D v2, Vector3D v3) {
-        Vector3D v0v1 = v1.subtract(v0);
-        Vector3D v0p = point.subtract(v0);
+    @Override
+    public Vector3D getNormal(Vector3D point) {
+        double epsilon = 1e-6;
 
-        double dot00 = v0v1.dot(v0v1);
-        double dot01 = v0v1.dot(v0p);
+        // Check if point is on the base
+        if (Math.abs(point.getY() - baseCenter.getY()) < epsilon) {
+            return new Vector3D(0, -1, 0);
+        }
 
-        Vector3D v2v3 = v3.subtract(v2);
-        Vector3D v2p = point.subtract(v2);
+        // Find the face the point is on and return its normal
+        for (int i = 0; i < 4; i++) {
+            Vector3D v1 = baseVertices[i];
+            Vector3D v2 = baseVertices[(i + 1) % 4];
+            Vector3D faceNormal = v2.subtract(v1).cross(apex.subtract(v1)).normalize();
+            
+            // If the point is very close to the plane of this face, return the face normal
+            if (Math.abs(faceNormal.dot(point.subtract(v1))) < epsilon) {
+                return faceNormal;
+            }
+        }
 
-        double dot11 = v2v3.dot(v2v3);
-        double dot10 = v2v3.dot(v2p);
+        // This should not happen if the point is on the pyramid surface
+        return new Vector3D(0, 1, 0);
+    }
 
-        return (dot01 >= 0 && dot01 <= dot00 && dot10 >= 0 && dot10 <= dot11);
+    private boolean isPointInBase(Vector3D point) {
+        Vector3D v0 = baseVertices[1].subtract(baseVertices[0]);
+        Vector3D v1 = baseVertices[3].subtract(baseVertices[0]);
+        Vector3D v2 = point.subtract(baseVertices[0]);
+
+        double dot00 = v0.dot(v0);
+        double dot01 = v0.dot(v1);
+        double dot02 = v0.dot(v2);
+        double dot11 = v1.dot(v1);
+        double dot12 = v1.dot(v2);
+
+        double invDenom = 1 / (dot00 * dot11 - dot01 * dot01);
+        double u = (dot11 * dot02 - dot01 * dot12) * invDenom;
+        double v = (dot00 * dot12 - dot01 * dot02) * invDenom;
+
+        return (u >= 0) && (v >= 0) && (u + v <= 1);
+    }
+
+    private boolean isPointInTriangle(Vector3D point, Vector3D v1, Vector3D v2, Vector3D v3) {
+        Vector3D edge1 = v2.subtract(v1);
+        Vector3D edge2 = v3.subtract(v1);
+        Vector3D h = point.subtract(v1);
+
+        Vector3D normal = edge1.cross(edge2);
+        double a = normal.dot(h);
+        double b = normal.dot(edge1);
+        double c = normal.dot(edge2);
+
+        if (a >= 0 && a <= b && a <= c) {
+            return true;
+        }
+        return false;
     }
 }
