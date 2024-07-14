@@ -91,8 +91,8 @@ In this basic implementation, shading is simplified to just returning the color 
 Where:
 - $I_d, I_s$ are diffuse and specular intensities
 - $k_d, k_s$ are diffuse and specular coefficients
-- $N$ is surface normal, $ L $ is light direction
-- $R$ is reflection vector, $ V $ is view direction
+- $N$ is surface normal, $L$ is light direction
+- $R$ is reflection vector, $V$ is view direction
 - $I_l$ is light intensity
 - $n$ is specular exponent
 
