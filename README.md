@@ -97,3 +97,73 @@ Where:
 - $n$ is specular exponent
 
 The provided code implements a basic version of this theory, focusing on ray generation and simple intersection tests. It could be extended to include more advanced shading, reflections, refractions, and other effects for more realistic rendering.
+
+
+```java
+package com.mycompany.raytracer;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.util.List;
+import javax.swing.JPanel;
+
+public class RayTracer {
+    public void draw(List<Shape> shapes, JPanel panel, Vector3D cameraPosition, Vector3D lookAtPoint) {
+        // Get the dimensions of the rendering panel
+        int width = panel.getWidth();
+        int height = panel.getHeight();
+        
+        // Create a blank canvas to draw on
+        BufferedImage canvas = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        
+        // Set up the viewport dimensions
+        double viewportHeight = 2.0;
+        double viewportWidth = (double) width / height * viewportHeight;
+        
+        // Iterate over each pixel in the image
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                // Convert pixel coordinates to viewport coordinates
+                double u = (double) (x - width / 2) / width;
+                double v = (double) (y - height / 2) / height;
+                
+                // Calculate the direction of the ray for this pixel
+                Vector3D direction = new Vector3D(u * viewportWidth, v * viewportHeight, lookAtPoint.getZ()).normalize();
+                
+                // Create a ray from the camera position in the calculated direction
+                Ray ray = new Ray(cameraPosition, direction);
+                
+                // Trace the ray and get the color for this pixel
+                Color pixelColor = trace(ray, shapes);
+                
+                // Set the calculated color to the pixel in the canvas
+                canvas.setRGB(x, y, pixelColor.getRGB());
+            }
+        }
+        
+        // If the panel is a RenderPanel, update it with the new canvas
+        if (panel instanceof RenderPanel) {
+            ((RenderPanel) panel).setCanvas(canvas);
+        }
+    }
+
+    private Color trace(Ray ray, List<Shape> shapes) {
+        // Initialize the intersection distance to infinity
+        double[] t = { Double.MAX_VALUE };
+        
+        // Set the default color to black (background color)
+        Color hitColor = Color.BLACK;
+        
+        // Check intersection with all shapes in the scene
+        for (Shape shape : shapes) {
+            // If the ray intersects with a shape and it's closer than previous intersections
+            if (shape.intersect(ray, t)) {
+                // Set the hit color to the color of the intersected shape
+                hitColor = shape.getColor();
+            }
+        }
+        
+        // Return the color of the closest intersected shape (or background if no intersection)
+        return hitColor;
+    }
+}
+```
